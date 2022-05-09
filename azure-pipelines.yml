@@ -6,7 +6,7 @@
 trigger:
 - master
 - main
-
+- develop
 - feature/*
 - bugfix/*
 - hotfix/*
@@ -23,15 +23,15 @@ stages:
 - stage: 'Build'
   jobs:
   - job: 'BuildClient'
-    # pool:
-    #  name: 'Test'
+    #pool:
+    #name: 'Test'
     steps:  
-    
     - task: Npm@1
       displayName: 'Install Client Dependencies'
       inputs:
         command: 'install'
         workingDir: 'ClientApp'
+    
     - task: Npm@1
       displayName: 'Build Client Application'
       inputs:
@@ -40,6 +40,7 @@ stages:
         customCommand: 'run build --prod'
 
     
+
 
   - job: 'BuildDotnet'
     # pool: 
@@ -63,3 +64,96 @@ stages:
         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
         ArtifactName: 'drop'
         publishLocation: 'Container'
+
+- stage: 'DevDeployment'
+  jobs:
+    # Track deployments on the environment.
+  - deployment: DeployWeb
+    displayName: 'deploy Web App'
+    pool:
+      name: 'Demo1'
+    # Creates an environment if it doesn't exist.
+    environment: 'Development'
+    strategy:
+      # Default deployment strategy, more coming...
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureRmWebAppDeployment@4
+            inputs:
+              ConnectionType: 'AzureRM'
+              azureSubscription: 'Azure1'
+              appType: 'webAppLinux'
+              WebAppName: 'sindhudev'
+              packageForLinux: '$(Pipeline.Workspace)/drop/$(config)/*.zip'
+
+- stage: 'TestDeployment'
+  jobs:
+    # Track deployments on the environment.
+  - deployment: DeployWeb
+    displayName: 'deploy Web App'
+    pool:
+      name: 'Demo1'
+    # Creates an environment if it doesn't exist.
+    environment: 'Test'
+    strategy:
+      # Default deployment strategy, more coming...
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureRmWebAppDeployment@4
+            inputs:
+              ConnectionType: 'AzureRM'
+              azureSubscription: 'Azure1'
+              appType: 'webAppLinux'
+              WebAppName: 'sindutest'
+              packageForLinux: '$(Pipeline.Workspace)/drop/$(config)/*.zip'
+
+- stage: 'StagingDeployment'
+  jobs:
+    # Track deployments on the environment.
+  - deployment: DeployWeb
+    displayName: 'deploy Web App'
+    variables: 
+      app: sindhudev
+    pool:
+      name: 'Demo1'
+    # Creates an environment if it doesn't exist.
+    environment: 'Staging'
+    strategy:
+      # Default deployment strategy, more coming...
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureRmWebAppDeployment@4
+            inputs:
+              ConnectionType: 'AzureRM'
+              azureSubscription: 'Azure1'
+              appType: 'webAppLinux'
+              WebAppName: '$(app)'
+              packageForLinux: '$(Pipeline.Workspace)/drop/$(config)/*.zip'
+
+- stage: 'ProdDeployment'
+  jobs:
+    # Track deployments on the environment.
+  - deployment: DeployWeb
+    displayName: 'deploy Web App'
+    condition: and(succeeded(), eq(variables.isMain, 'true'))
+    variables: 
+      app: sindutest
+    pool:
+      name: 'Demo1'
+    # Creates an environment if it doesn't exist.
+    environment: 'Prod'
+    strategy:
+      # Default deployment strategy, more coming...
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureRmWebAppDeployment@4
+            inputs:
+              ConnectionType: 'AzureRM'
+              azureSubscription: 'Azure1'
+              appType: 'webAppLinux'
+              WebAppName: '$(app)'
+              packageForLinux: '$(Pipeline.Workspace)/drop/$(config)/*.zip'
